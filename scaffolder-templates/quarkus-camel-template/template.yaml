@@ -1,0 +1,167 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: quarkus-camel-template
+  title: Create a Camel Quarkus Application for Kubernetes
+  description: Create a Camel Quarkus Application for Kubernetes
+  tags:
+    - recommended
+    - quarkus
+    - camel
+    - microservice
+    - java
+spec:
+  owner: rhdh
+  type: service
+  system: microservices
+# these are the steps which are rendered in the frontend with the form input
+  parameters:
+    - title: Provide information about the new component
+      required:
+        - component_id
+      properties:
+        component_id:
+          title: Name
+          type: string
+          description: The name of the component. This will be used as the name of the directory and the name of the component in the catalog.
+          default: my-quarkus-app
+          ui:field: EntityNamePicker
+          msxLength: 14
+        description: 
+          title: Description
+          type: string
+          description: Help others understand what the component is for.
+    - title: Provide information about Java metadata
+      required:
+        - group_id
+        - artifact_id
+        - java_package_name
+      properties:
+        group_id:
+          title: Group ID
+          type: string
+          default: dev.mikeintoch
+          description: Maven Group ID eg (dev.mikeintoch)
+        artifact_id:
+          title: Artifact ID
+          type: string
+          default: my-quarkus-app
+          description: Maven Artifact ID
+        java_package_name:
+          title: Java Package Name
+          type: string
+          default: dev.mikeintoch
+          description: Name for the Java Package (e.g. dev.mikeintoch) should match GroupID and Artifact ID.
+    - title: Application repository Information
+      required:
+        - repo
+      properties:
+        repo:
+          title: Repository Location
+          type: object
+          properties:
+            host:
+              title: Repo Host
+              type: string
+              description: The location of the repository where the application will be created.
+              default: github.com
+              enum:
+              - github.com
+            owner:
+              title: Repo Owner
+              type: string
+              description: The owner of the repository where the application will be created.
+              default: mikeintoch
+              enum:
+              - mikeintoch
+#here are the steps that are executed in series in the scaffolder backend
+  steps:
+    - id: template 
+      name: Fetch Skeleton + Template
+      action: fetch:template
+      input:
+        url: ./skeleton
+        copyWithoutTemplating:
+          - .github/workflows/*
+        values:
+          component_id: ${{ parameters.component_id }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.repo.owner }}
+          applicationType: api
+          group_id: ${{ parameters.group_id }}
+          artifact_id: ${{ parameters.artifact_id }}
+          java_package_name: ${{ parameters.java_package_name }}
+          destination: ${{ parameters.repo.owner }}/${{ parameters.component_id }}
+          host: ${{ parameters.repo.host }}
+    
+    - id: publish
+      name: Publish
+      action: publish:github
+      input:
+        allowedHosts: ["github.com"]
+        description: First commit made by Red Hat Developer Hub
+        repoUrl: "${{ parameters.repo.host }}?owner=${{ parameters.repo.owner }}&repo=${{ parameters.component_id }}"
+        defaultBranch: main
+        repoVisibility: public
+
+    - id: register
+      name: Register
+      action: catalog:register
+      input:
+        repoContentsUrl:  ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: "/catalog-info.yaml"
+
+    - id: template-gitops-deployment
+      name: Generate GitOps Deployment
+      action: fetch:template
+      input:
+        url: ./gitops
+        copyWithoutTemplating: []
+        values:
+          component_id: ${{ parameters.component_id }}
+          description: ${{ parameters.description }}
+          destination: https://${{ parameters.repo.host }}/${{ parameters.repo.owner }}/${{parameters.component_id}}-gitops.git
+          source_repository: https://${{ parameters.repo.host }}/${{ parameters.repo.owner }}/${{parameters.component_id}}.git
+          repository_name: ${{parameters.component_id}}
+          git_owner: ${{ parameters.repo.owner }}
+          cluster: .apps.cluster-lqhhl.sandbox3194.opentlc.com
+          namespace: ${{ parameters.component_id }}-dev
+          image_registry: ${{ parameters.image_registry }}
+          image_host: ${{ parameters.image_host }}
+          image_organization: ${{ parameters.image_organization }}
+          image_name: ${{ parameters.component_id }}
+          image_tag: ${{ parameters.image_tag }}
+          port: 8080
+          repository_host: ${{ parameters.repo.host }}
+          deployment_name: quarkus-template
+          user: ${{ user.entity.metadata.name }}
+        targetPath: ./tenant-gitops
+
+    - id: publish-gitops
+      name: Publishing to Resource Repository
+      action: publish:github
+      input:
+        allowedHosts: ["github.com"]
+        description: gitops resources for ${{ parameters.component_id }}
+        repoUrl: "${{ parameters.repo.host }}?owner=${{ parameters.repo.owner }}&repo=${{ parameters.component_id }}-gitops"
+        sourcePath: ./tenant-gitops
+        defaultBranch: main
+        repoVisibility: public
+
+    - id: create-argocd-resources
+      name: Create ArgoCD Resources
+      action: argocd:create-resources
+      input:
+        appName: ${{ parameters.component_id }}
+        argoInstance: main
+        namespace: argocd
+        repoUrl: https://${{ parameters.repo.host }}/${{ parameters.repo.owner }}/${{parameters.component_id}}-gitops.git
+        path: 'manifests'
+        
+  output:
+    links:
+      - title: Source Code Repository
+        url: ${{ steps.publish.output.remoteUrl }}
+      - title: Open Component in catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}

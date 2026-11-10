@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: software-templates
+  description: A collection of Backstage templates for devhub
+spec:
+  type: url
+  targets:
+    - scaffolder-templates/quarkus-camel-template/template.yaml
