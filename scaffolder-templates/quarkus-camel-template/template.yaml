@@ -71,9 +71,9 @@ spec:
               title: Repo Owner
               type: string
               description: The owner of the repository where the application will be created.
-              default: mikeintoch
+              default: mydemodev
               enum:
-              - mikeintoch
+              - mydemodev
 #here are the steps that are executed in series in the scaffolder backend
   steps:
     - id: template 
