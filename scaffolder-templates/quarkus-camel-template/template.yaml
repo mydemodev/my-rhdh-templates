@@ -98,7 +98,6 @@ spec:
       name: Publish
       action: publish:github
       input:
-        allowedHosts: ["github.com"]
         description: First commit made by Red Hat Developer Hub
         repoUrl: "${{ parameters.repo.host }}?owner=${{ parameters.repo.owner }}&repo=${{ parameters.component_id }}"
         defaultBranch: main
