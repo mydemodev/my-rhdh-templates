@@ -151,8 +151,8 @@ spec:
       action: argocd:create-resources
       input:
         appName: ${{ parameters.component_id }}
-        argoInstance: main
-        namespace: argocd
+        argoInstance: clusterargo
+        namespace: other-gitops
         repoUrl: https://${{ parameters.repo.host }}/${{ parameters.repo.owner }}/${{parameters.component_id}}-gitops.git
         path: 'manifests'
         
